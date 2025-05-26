@@ -36,10 +36,48 @@ public class PopulationService {
             }
             double avg = sum / windowSize;
             forecast.add(avg);
-            values = new ArrayList<>(values); // нужно копировать, чтобы не менять исходные данные
+            values = new ArrayList<>(values); // копия, чтобы не менять исходник
             values.add(avg);
         }
         return forecast;
     }
-}
+    public GrowthStats calculateGrowthStats(List<PopulationData> data) {
+        if (data == null || data.size() < 2) return null;
 
+        double maxIncrease = Double.NEGATIVE_INFINITY;
+        double maxDecrease = Double.POSITIVE_INFINITY;
+
+        for (int i = 1; i < data.size(); i++) {
+            double prev = data.get(i - 1).getPopulation();
+            double curr = data.get(i).getPopulation();
+            double changePercent = ((curr - prev) / prev) * 100;
+
+            if (changePercent > maxIncrease) {
+                maxIncrease = changePercent;
+            }
+            if (changePercent < maxDecrease) {
+                maxDecrease = changePercent;
+            }
+        }
+
+        return new GrowthStats(maxIncrease, maxDecrease);
+    }
+
+    public static class GrowthStats {
+        private final double maxIncreasePercent;
+        private final double maxDecreasePercent;
+
+        public GrowthStats(double maxIncreasePercent, double maxDecreasePercent) {
+            this.maxIncreasePercent = maxIncreasePercent;
+            this.maxDecreasePercent = maxDecreasePercent;
+        }
+
+        public double getMaxIncreasePercent() {
+            return maxIncreasePercent;
+        }
+
+        public double getMaxDecreasePercent() {
+            return maxDecreasePercent;
+        }
+    }
+}
