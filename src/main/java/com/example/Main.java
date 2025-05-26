@@ -7,10 +7,11 @@ import javafx.stage.Stage;
 public class Main extends Application {
     @Override
     public void start(Stage primaryStage) {
-        new PopulationView(primaryStage);
+        PopulationView view = new PopulationView();
+        view.start(primaryStage);
     }
 
     public static void main(String[] args) {
-        launch(args);
+        launch(args); // Запуск JavaFX
     }
 }

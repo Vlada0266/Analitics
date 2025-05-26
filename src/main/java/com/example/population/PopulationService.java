@@ -26,7 +26,7 @@ public class PopulationService {
 
     public List<Double> calculateForecast(List<PopulationData> data, int windowSize, int forecastYears) {
         List<Double> forecast = new ArrayList<>();
-        List<Double> values = data.stream().map(PopulationData::getPopulation).toList();
+        List<Double> values = data.stream().map(PopulationData::getValue).toList();
 
         for (int i = 0; i < forecastYears; i++) {
             int startIdx = values.size() - windowSize;
@@ -48,8 +48,8 @@ public class PopulationService {
         double maxDecrease = Double.POSITIVE_INFINITY;
 
         for (int i = 1; i < data.size(); i++) {
-            double prev = data.get(i - 1).getPopulation();
-            double curr = data.get(i).getPopulation();
+            double prev = data.get(i - 1).getValue();
+            double curr = data.get(i).getValue();
             double changePercent = ((curr - prev) / prev) * 100;
 
             if (changePercent > maxIncrease) {
