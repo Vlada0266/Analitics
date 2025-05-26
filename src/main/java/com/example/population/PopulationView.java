@@ -15,11 +15,18 @@ public class PopulationView {
     private final PopulationController controller;
     private List<PopulationData> populationData;
 
+    private Label maxIncreaseLabel;
+    private Label maxDecreaseLabel;
+
     public PopulationView(Stage primaryStage) {
         this.controller = new PopulationController();
 
         Label fileLabel = new Label("Выберите CSV-файл с данными (год;численность):");
         Button loadButton = new Button("Загрузить данные");
+
+        maxIncreaseLabel = new Label("Максимальный прирост за год: — данные не загружены —");
+        maxDecreaseLabel = new Label("Максимальное снижение за год: — данные не загружены —");
+
         Label windowLabel = new Label("Окно скользящей средней:");
         TextField windowField = new TextField("3");
         Label forecastLabel = new Label("Число лет для прогноза:");
@@ -33,6 +40,7 @@ public class PopulationView {
         chart.setCreateSymbols(false);
 
         VBox root = new VBox(10, fileLabel, loadButton,
+                maxIncreaseLabel, maxDecreaseLabel,
                 windowLabel, windowField,
                 forecastLabel, forecastField,
                 forecastButton, chart);
@@ -49,6 +57,7 @@ public class PopulationView {
                 } else {
                     showAlert("Успех", "Данные успешно загружены.");
                     displayChart(chart);
+                    displayGrowthStats(populationData);
                 }
             }
         });
@@ -96,6 +105,14 @@ public class PopulationView {
         }
 
         chart.getData().add(forecastSeries);
+    }
+
+    private void displayGrowthStats(List<PopulationData> data) {
+        PopulationService.GrowthStats stats = controller.calculateGrowthStats(data);
+        if (stats != null) {
+            maxIncreaseLabel.setText(String.format("Максимальный прирост за год: %.2f%%", stats.getMaxIncreasePercent()));
+            maxDecreaseLabel.setText(String.format("Максимальное снижение за год: %.2f%%", stats.getMaxDecreasePercent()));
+        }
     }
 
     private void showAlert(String title, String message) {

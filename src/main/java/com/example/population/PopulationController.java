@@ -17,4 +17,8 @@ public class PopulationController {
     public List<Double> forecast(List<PopulationData> data, int windowSize, int years) {
         return populationService.calculateForecast(data, windowSize, years);
     }
+
+    public PopulationService.GrowthStats calculateGrowthStats(List<PopulationData> data) {
+        return populationService.calculateGrowthStats(data);
+    }
 }
