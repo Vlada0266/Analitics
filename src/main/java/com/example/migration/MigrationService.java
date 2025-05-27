@@ -8,6 +8,7 @@ import java.util.List;
 
 public class MigrationService {
 
+    // загрузка из CSV
     public List<MigrationData> loadDataFromCSV(File file) {
         List<MigrationData> dataList = new ArrayList<>();
         try {
@@ -25,4 +26,65 @@ public class MigrationService {
         }
         return dataList;
     }
+
+    // статистика миграции — макс прирост и спад
+    public MigrationStats calculateMigrationStats(List<MigrationData> data) {
+        if (data == null || data.size() < 2) return null;
+
+        double maxIncrease = Double.NEGATIVE_INFINITY;
+        double maxDecrease = Double.POSITIVE_INFINITY;
+
+        for (int i = 1; i < data.size(); i++) {
+            double prev = data.get(i - 1).getValue();
+            double curr = data.get(i).getValue();
+            double changePercent = ((curr - prev) / Math.abs(prev)) * 100;
+
+            if (changePercent > maxIncrease) {
+                maxIncrease = changePercent;
+            }
+            if (changePercent < maxDecrease) {
+                maxDecrease = changePercent;
+            }
+        }
+
+        return new MigrationStats(maxIncrease, maxDecrease);
+    }
+
+    public static class MigrationStats {
+        private final double maxIncreasePercent;
+        private final double maxDecreasePercent;
+
+        public MigrationStats(double maxIncreasePercent, double maxDecreasePercent) {
+            this.maxIncreasePercent = maxIncreasePercent;
+            this.maxDecreasePercent = maxDecreasePercent;
+        }
+
+        public double getMaxIncreasePercent() {
+            return maxIncreasePercent;
+        }
+
+        public double getMaxDecreasePercent() {
+            return maxDecreasePercent;
+        }
+    }
+
+    // прогнозирование
+    public List<Double> calculateForecast(List<MigrationData> data, int windowSize, int forecastYears) {
+        List<Double> forecast = new ArrayList<>();
+        List<Double> values = data.stream().map(MigrationData::getValue).toList();
+
+        for (int i = 0; i < forecastYears; i++) {
+            int startIdx = values.size() - windowSize;
+            double sum = 0;
+            for (int j = startIdx; j < values.size(); j++) {
+                sum += values.get(j);
+            }
+            double avg = sum / windowSize;
+            forecast.add(avg);
+            values = new ArrayList<>(values);
+            values.add(avg);
+        }
+        return forecast;
+    }
 }
+
