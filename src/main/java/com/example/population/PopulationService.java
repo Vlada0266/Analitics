@@ -1,83 +1,77 @@
 package com.example.population;
 
-import java.io.*;
-import java.nio.file.*;
-import java.util.*;
+import java.io.BufferedReader;
+import java.nio.file.Files;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 public class PopulationService {
 
     public List<PopulationData> loadDataFromCSV(File file) {
-        List<PopulationData> dataList = new ArrayList<>();
-        try {
-            List<String> lines = Files.readAllLines(file.toPath());
-            for (String line : lines) {
-                String[] parts = line.split("[,;\\t]");
-                if (parts.length >= 2) {
+        List<PopulationData> list = new ArrayList<>();
+        try (BufferedReader br = Files.newBufferedReader(file.toPath())) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] parts = line.split(";");
+                if (parts.length == 2) {
                     int year = Integer.parseInt(parts[0].trim());
-                    double population = Double.parseDouble(parts[1].trim());
-                    dataList.add(new PopulationData(year, population));
+                    double value = Double.parseDouble(parts[1].trim());
+                    list.add(new PopulationData(year, value));
                 }
             }
-        } catch (IOException | NumberFormatException e) {
-            e.printStackTrace();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return null;
         }
-        return dataList;
+        return list;
     }
 
-    public List<Double> calculateForecast(List<PopulationData> data, int windowSize, int forecastYears) {
-        List<Double> forecast = new ArrayList<>();
-        List<Double> values = data.stream().map(PopulationData::getValue).toList();
-
-        for (int i = 0; i < forecastYears; i++) {
-            int startIdx = values.size() - windowSize;
-            double sum = 0;
-            for (int j = startIdx; j < values.size(); j++) {
-                sum += values.get(j);
-            }
-            double avg = sum / windowSize;
-            forecast.add(avg);
-            values = new ArrayList<>(values); // копия, чтобы не менять исходник
-            values.add(avg);
-        }
-        return forecast;
-    }
     public GrowthStats calculateGrowthStats(List<PopulationData> data) {
-        if (data == null || data.size() < 2) return null;
-
-        double maxIncrease = Double.NEGATIVE_INFINITY;
-        double maxDecrease = Double.POSITIVE_INFINITY;
-
+        double maxGrowth = 0;
+        double maxDecline = 0;
         for (int i = 1; i < data.size(); i++) {
             double prev = data.get(i - 1).getValue();
             double curr = data.get(i).getValue();
-            double changePercent = ((curr - prev) / prev) * 100;
+            double growth = ((curr - prev) / prev) * 100;
+            if (growth > maxGrowth) maxGrowth = growth;
 
-            if (changePercent > maxIncrease) {
-                maxIncrease = changePercent;
-            }
-            if (changePercent < maxDecrease) {
-                maxDecrease = changePercent;
-            }
+            double decline = ((prev - curr) / prev) * 100;
+            if (decline > maxDecline) maxDecline = decline;
         }
+        return new GrowthStats(maxGrowth, maxDecline);
+    }
 
-        return new GrowthStats(maxIncrease, maxDecrease);
+    public List<PopulationData> calculateMovingAverageForecast(List<PopulationData> data, int windowSize, int forecastYears) {
+        List<PopulationData> forecast = new ArrayList<>();
+        int dataSize = data.size();
+        if (dataSize < windowSize) return forecast;
+
+        for (int i = 0; i < forecastYears; i++) {
+            double sum = 0;
+            for (int j = dataSize - windowSize + i; j < dataSize + i; j++) {
+                double val;
+                if (j < dataSize) {
+                    val = data.get(j).getValue();
+                } else {
+                    val = forecast.get(j - dataSize).getValue();
+                }
+                sum += val;
+            }
+            double avg = sum / windowSize;
+            int year = data.get(dataSize - 1).getYear() + i + 1;
+            forecast.add(new PopulationData(year, avg));
+        }
+        return forecast;
     }
 
     public static class GrowthStats {
-        private final double maxIncreasePercent;
-        private final double maxDecreasePercent;
+        public final double maxGrowth;
+        public final double maxDecline;
 
-        public GrowthStats(double maxIncreasePercent, double maxDecreasePercent) {
-            this.maxIncreasePercent = maxIncreasePercent;
-            this.maxDecreasePercent = maxDecreasePercent;
-        }
-
-        public double getMaxIncreasePercent() {
-            return maxIncreasePercent;
-        }
-
-        public double getMaxDecreasePercent() {
-            return maxDecreasePercent;
+        public GrowthStats(double maxGrowth, double maxDecline) {
+            this.maxGrowth = maxGrowth;
+            this.maxDecline = maxDecline;
         }
     }
 }

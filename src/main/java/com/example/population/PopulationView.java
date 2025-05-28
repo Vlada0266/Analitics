@@ -8,9 +8,7 @@ import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
-import java.io.*;
-import java.nio.file.Files;
-import java.util.ArrayList;
+import java.io.File;
 import java.util.List;
 
 public class PopulationView {
@@ -19,7 +17,13 @@ public class PopulationView {
     private LineChart<Number, Number> chart;
     private Label growthLabel;
     private Label declineLabel;
-    private TextField forecastInput;
+    private TextField forecastYearsInput;
+
+    private PopulationController controller;
+
+    public PopulationView() {
+        this.controller = new PopulationController();
+    }
 
     public void start(Stage stage) {
         this.primaryStage = stage;
@@ -29,9 +33,8 @@ public class PopulationView {
 
         Button loadButton = new Button("Загрузить данные");
 
-        // Поле для ввода количества лет прогноза
         Label forecastLabel = new Label("Количество лет прогноза:");
-        TextField forecastYearsInput = new TextField("5");
+        forecastYearsInput = new TextField("5");
         forecastYearsInput.setPrefWidth(60);
         HBox forecastBox = new HBox(10, forecastLabel, forecastYearsInput);
         forecastBox.setPadding(new Insets(5));
@@ -70,7 +73,7 @@ public class PopulationView {
             fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV файлы", "*.csv"));
             File file = fileChooser.showOpenDialog(primaryStage);
             if (file != null) {
-                List<PopulationData> data = loadDataFromFile(file);
+                List<PopulationData> data = controller.loadPopulationData(file);
                 if (data != null) {
                     int forecastYears = 5; // по умолчанию
                     try {
@@ -84,9 +87,9 @@ public class PopulationView {
                     }
 
                     displayData(data, forecastYears);
-                    double maxGrowth = calculateMaxGrowth(data);
-                    double maxDecline = calculateMaxDecline(data);
-                    setGrowthAndDecline(maxGrowth, maxDecline);
+
+                    PopulationService.GrowthStats stats = controller.calculateGrowthStats(data);
+                    setGrowthAndDecline(stats.maxGrowth, stats.maxDecline);
                 } else {
                     showAlert("Ошибка", "Не удалось загрузить данные из файла.");
                 }
@@ -98,72 +101,6 @@ public class PopulationView {
         Scene scene = new Scene(root, 800, 700);
         primaryStage.setScene(scene);
         primaryStage.show();
-    }
-
-
-    // Метод загрузки данных из файла с разделителем ";"
-    private List<PopulationData> loadDataFromFile(File file) {
-        List<PopulationData> list = new ArrayList<>();
-        try (BufferedReader br = Files.newBufferedReader(file.toPath())) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                String[] parts = line.split(";");
-                if (parts.length == 2) {
-                    int year = Integer.parseInt(parts[0].trim());
-                    double value = Double.parseDouble(parts[1].trim());
-                    list.add(new PopulationData(year, value));
-                }
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            return null;
-        }
-        return list;
-    }
-
-    private double calculateMaxGrowth(List<PopulationData> data) {
-        double maxGrowth = 0;
-        for (int i = 1; i < data.size(); i++) {
-            double prev = data.get(i - 1).getValue();
-            double curr = data.get(i).getValue();
-            double growth = ((curr - prev) / prev) * 100;
-            if (growth > maxGrowth) maxGrowth = growth;
-        }
-        return maxGrowth;
-    }
-
-    private double calculateMaxDecline(List<PopulationData> data) {
-        double maxDecline = 0;
-        for (int i = 1; i < data.size(); i++) {
-            double prev = data.get(i - 1).getValue();
-            double curr = data.get(i).getValue();
-            double decline = ((prev - curr) / prev) * 100;
-            if (decline > maxDecline) maxDecline = decline;
-        }
-        return maxDecline;
-    }
-
-    private List<PopulationData> calculateMovingAverageForecast(List<PopulationData> data, int windowSize, int forecastYears) {
-        List<PopulationData> forecast = new ArrayList<>();
-        int dataSize = data.size();
-        if (dataSize < windowSize) return forecast; // Если данных мало — прогноз не считаем
-
-        for (int i = 0; i < forecastYears; i++) {
-            double sum = 0;
-            for (int j = dataSize - windowSize + i; j < dataSize + i; j++) {
-                double val;
-                if (j < dataSize) {
-                    val = data.get(j).getValue();
-                } else {
-                    val = forecast.get(j - dataSize).getValue();
-                }
-                sum += val;
-            }
-            double avg = sum / windowSize;
-            int year = data.get(dataSize - 1).getYear() + i + 1;
-            forecast.add(new PopulationData(year, avg));
-        }
-        return forecast;
     }
 
     public void displayData(List<PopulationData> populationData, int forecastYears) {
@@ -179,9 +116,9 @@ public class PopulationView {
         }
         chart.getData().add(series);
 
-        int windowSize = 3; // можно сделать вводимым тоже, но пока фиксировано
+        int windowSize = 3;
 
-        List<PopulationData> forecast = calculateMovingAverageForecast(populationData, windowSize, forecastYears);
+        List<PopulationData> forecast = controller.getMovingAverageForecast(populationData, windowSize, forecastYears);
 
         if (!forecast.isEmpty()) {
             XYChart.Series<Number, Number> forecastSeries = new XYChart.Series<>();
@@ -191,7 +128,6 @@ public class PopulationView {
             }
             chart.getData().add(forecastSeries);
 
-            // Пунктирная красная линия
             forecastSeries.nodeProperty().addListener((obs, oldNode, newNode) -> {
                 if (newNode != null) {
                     newNode.setStyle("-fx-stroke: red; -fx-stroke-dash-array: 12 6;");

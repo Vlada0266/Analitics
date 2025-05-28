@@ -14,8 +14,8 @@ public class PopulationController {
         return populationService.loadDataFromCSV(file);
     }
 
-    public List<Double> forecast(List<PopulationData> data, int windowSize, int years) {
-        return populationService.calculateForecast(data, windowSize, years);
+    public List<PopulationData> getMovingAverageForecast(List<PopulationData> data, int windowSize, int forecastYears) {
+        return populationService.calculateMovingAverageForecast(data, windowSize, forecastYears);
     }
 
     public PopulationService.GrowthStats calculateGrowthStats(List<PopulationData> data) {
