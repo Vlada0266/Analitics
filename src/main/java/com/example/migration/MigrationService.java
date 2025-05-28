@@ -17,8 +17,8 @@ public class MigrationService {
                 String[] parts = line.split("[,;\\t]");
                 if (parts.length >= 2) {
                     int year = Integer.parseInt(parts[0].trim());
-                    double migrationValue = Double.parseDouble(parts[1].trim());
-                    dataList.add(new MigrationData(year, migrationValue));
+                    double value = Double.parseDouble(parts[1].trim());
+                    dataList.add(new MigrationData(year, value));
                 }
             }
         } catch (IOException | NumberFormatException e) {
@@ -27,7 +27,7 @@ public class MigrationService {
         return dataList;
     }
 
-    // статистика миграции — макс прирост и спад
+    // Анализ статистики
     public MigrationStats calculateMigrationStats(List<MigrationData> data) {
         if (data == null || data.size() < 2) return null;
 
@@ -39,17 +39,14 @@ public class MigrationService {
             double curr = data.get(i).getValue();
             double changePercent = ((curr - prev) / Math.abs(prev)) * 100;
 
-            if (changePercent > maxIncrease) {
-                maxIncrease = changePercent;
-            }
-            if (changePercent < maxDecrease) {
-                maxDecrease = changePercent;
-            }
+            if (changePercent > maxIncrease) maxIncrease = changePercent;
+            if (changePercent < maxDecrease) maxDecrease = changePercent;
         }
 
         return new MigrationStats(maxIncrease, maxDecrease);
     }
 
+    // Класс для хранения статистики
     public static class MigrationStats {
         private final double maxIncreasePercent;
         private final double maxDecreasePercent;
@@ -59,19 +56,17 @@ public class MigrationService {
             this.maxDecreasePercent = maxDecreasePercent;
         }
 
-        public double getMaxIncreasePercent() {
-            return maxIncreasePercent;
-        }
-
-        public double getMaxDecreasePercent() {
-            return maxDecreasePercent;
-        }
+        public double getMaxIncreasePercent() { return maxIncreasePercent; }
+        public double getMaxDecreasePercent() { return maxDecreasePercent; }
     }
 
-    // прогнозирование
+    // Прогноз скользящим средним
     public List<Double> calculateForecast(List<MigrationData> data, int windowSize, int forecastYears) {
         List<Double> forecast = new ArrayList<>();
-        List<Double> values = data.stream().map(MigrationData::getValue).toList();
+        List<Double> values = new ArrayList<>();
+        for (MigrationData d : data) {
+            values.add(d.getValue());
+        }
 
         for (int i = 0; i < forecastYears; i++) {
             int startIdx = values.size() - windowSize;
@@ -81,10 +76,8 @@ public class MigrationService {
             }
             double avg = sum / windowSize;
             forecast.add(avg);
-            values = new ArrayList<>(values);
             values.add(avg);
         }
         return forecast;
     }
 }
-

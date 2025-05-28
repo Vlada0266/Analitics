@@ -8,17 +8,20 @@ import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
-import java.io.*;
-import java.nio.file.Files;
-import java.util.ArrayList;
+import java.io.File;
 import java.util.List;
 
 public class MigrationView {
+    private final MigrationController controller;
     private Stage primaryStage;
     private TableView<MigrationData> tableView;
     private LineChart<Number, Number> chart;
     private Label growthLabel;
     private Label declineLabel;
+
+    public MigrationView() {
+        this.controller = new MigrationController();
+    }
 
     public void start(Stage stage) {
         this.primaryStage = stage;
@@ -28,11 +31,10 @@ public class MigrationView {
 
         Button loadButton = new Button("Загрузить данные");
 
-        // Поле для ввода количества лет прогноза
         Label forecastLabel = new Label("Количество лет прогноза:");
-        TextField forecastYearsInput = new TextField("5");
-        forecastYearsInput.setPrefWidth(60);
-        HBox forecastBox = new HBox(10, forecastLabel, forecastYearsInput);
+        TextField forecastInput = new TextField("5");
+        forecastInput.setPrefWidth(60);
+        HBox forecastBox = new HBox(10, forecastLabel, forecastInput);
         forecastBox.setPadding(new Insets(5));
 
         // Таблица
@@ -68,24 +70,23 @@ public class MigrationView {
             fileChooser.setTitle("Выберите CSV-файл");
             fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV файлы", "*.csv"));
             File file = fileChooser.showOpenDialog(primaryStage);
+
             if (file != null) {
-                List<MigrationData> data = loadDataFromFile(file);
-                if (data != null) {
-                    int forecastYears = 5; // по умолчанию
+                List<MigrationData> data = controller.loadMigrationData(file);
+
+                if (data != null && !data.isEmpty()) {
+                    int forecastYears = 5;
                     try {
-                        String inputText = forecastYearsInput.getText().trim();
-                        if (!inputText.isEmpty()) {
-                            forecastYears = Integer.parseInt(inputText);
+                        String text = forecastInput.getText().trim();
+                        if (!text.isEmpty()) {
+                            forecastYears = Integer.parseInt(text);
                             if (forecastYears < 0) throw new NumberFormatException();
                         }
                     } catch (NumberFormatException ex) {
-                        showAlert("Ошибка", "Введите корректное количество лет прогноза (целое положительное число). Используется значение по умолчанию (5).");
+                        showAlert("Ошибка", "Введите корректное количество лет прогноза. Используется значение 5.");
                     }
 
-                    displayData(data, forecastYears);
-                    double maxGrowth = calculateMaxGrowth(data);
-                    double maxDecline = calculateMaxDecline(data);
-                    setGrowthAndDecline(maxGrowth, maxDecline);
+                    updateView(data, forecastYears);
                 } else {
                     showAlert("Ошибка", "Не удалось загрузить данные из файла.");
                 }
@@ -99,111 +100,47 @@ public class MigrationView {
         primaryStage.show();
     }
 
-    private List<MigrationData> loadDataFromFile(File file) {
-        List<MigrationData> list = new ArrayList<>();
-        try (BufferedReader br = Files.newBufferedReader(file.toPath())) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                String[] parts = line.split(";");
-                if (parts.length == 2) {
-                    int year = Integer.parseInt(parts[0].trim());
-                    double value = Double.parseDouble(parts[1].trim());
-                    list.add(new MigrationData(year, value));
-                }
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            return null;
-        }
-        return list;
-    }
-
-    private double calculateMaxGrowth(List<MigrationData> data) {
-        double maxGrowth = 0;
-        for (int i = 1; i < data.size(); i++) {
-            double prev = data.get(i - 1).getValue();
-            double curr = data.get(i).getValue();
-            double growth = ((curr - prev) / Math.abs(prev)) * 100;
-            if (growth > maxGrowth) maxGrowth = growth;
-        }
-        return maxGrowth;
-    }
-
-    private double calculateMaxDecline(List<MigrationData> data) {
-        double maxDecline = 0;
-        for (int i = 1; i < data.size(); i++) {
-            double prev = data.get(i - 1).getValue();
-            double curr = data.get(i).getValue();
-            double decline = ((prev - curr) / Math.abs(prev)) * 100;
-            if (decline > maxDecline) maxDecline = decline;
-        }
-        return maxDecline;
-    }
-
-    private List<MigrationData> calculateMovingAverageForecast(List<MigrationData> data, int windowSize, int forecastYears) {
-        List<MigrationData> forecast = new ArrayList<>();
-        int dataSize = data.size();
-        if (dataSize < windowSize) return forecast; // Если данных мало — прогноз не считаем
-
-        for (int i = 0; i < forecastYears; i++) {
-            double sum = 0;
-            for (int j = dataSize - windowSize + i; j < dataSize + i; j++) {
-                double val;
-                if (j < dataSize) {
-                    val = data.get(j).getValue();
-                } else {
-                    val = forecast.get(j - dataSize).getValue();
-                }
-                sum += val;
-            }
-            double avg = sum / windowSize;
-            int year = data.get(dataSize - 1).getYear() + i + 1;
-            forecast.add(new MigrationData(year, avg));
-        }
-        return forecast;
-    }
-
-    public void displayData(List<MigrationData> data, int forecastYears) {
+    private void updateView(List<MigrationData> data, int forecastYears) {
+        // Обновляем таблицу
         tableView.getItems().clear();
         tableView.getItems().addAll(data);
 
+        // Обновляем график
         chart.getData().clear();
 
-        XYChart.Series<Number, Number> series = new XYChart.Series<>();
-        series.setName("Миграционный баланс");
+        XYChart.Series<Number, Number> actualSeries = new XYChart.Series<>();
+        actualSeries.setName("Миграционный баланс");
         for (MigrationData d : data) {
-            series.getData().add(new XYChart.Data<>(d.getYear(), d.getValue()));
+            actualSeries.getData().add(new XYChart.Data<>(d.getYear(), d.getValue()));
         }
-        chart.getData().add(series);
+        chart.getData().add(actualSeries);
 
-        int windowSize = 3;
+        // Получаем прогноз из контроллера
+        List<Double> forecastValues = controller.getForecast(data, 3, forecastYears);
 
-        List<MigrationData> forecast = calculateMovingAverageForecast(data, windowSize, forecastYears);
-
-        if (!forecast.isEmpty()) {
+        if (!forecastValues.isEmpty()) {
             XYChart.Series<Number, Number> forecastSeries = new XYChart.Series<>();
             forecastSeries.setName("Прогноз (скользящая средняя)");
-            for (MigrationData d : forecast) {
-                forecastSeries.getData().add(new XYChart.Data<>(d.getYear(), d.getValue()));
+
+            int lastYear = data.get(data.size() - 1).getYear();
+            for (int i = 0; i < forecastValues.size(); i++) {
+                forecastSeries.getData().add(new XYChart.Data<>(lastYear + i + 1, forecastValues.get(i)));
             }
             chart.getData().add(forecastSeries);
-
-            forecastSeries.nodeProperty().addListener((obs, oldNode, newNode) -> {
-                if (newNode != null) {
-                    newNode.setStyle("-fx-stroke: red; -fx-stroke-dash-array: 12 6;");
-                }
-            });
         }
-    }
 
-    public void setGrowthAndDecline(double maxGrowth, double maxDecline) {
-        growthLabel.setText(String.format("Макс. прирост: %.2f%%", maxGrowth));
-        declineLabel.setText(String.format("Макс. убыль: %.2f%%", maxDecline));
+        // Обновляем статистику
+        MigrationService.MigrationStats stats = controller.getMigrationStats(data);
+        if (stats != null) {
+            growthLabel.setText(String.format("Макс. прирост: %.2f%%", stats.getMaxIncreasePercent()));
+            declineLabel.setText(String.format("Макс. убыль: %.2f%%", stats.getMaxDecreasePercent()));
+        }
     }
 
     private void showAlert(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
+        Alert alert = new Alert(Alert.AlertType.WARNING);
         alert.setTitle(title);
+        alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
     }
