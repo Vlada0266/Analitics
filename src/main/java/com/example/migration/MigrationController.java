@@ -4,24 +4,23 @@ import java.io.File;
 import java.util.List;
 
 public class MigrationController {
-    private final MigrationService migrationService;
+    private final MigrationService service = new MigrationService();
 
-    public MigrationController() {
-        this.migrationService = new MigrationService();
+    public List<MigrationData> loadMigrationData(File f) {
+        return service.loadDataFromCSV(f);
     }
 
-    // В контроллере - интерфейс загрузки данных из файла (передаем файл, получаем список данных)
-    public List<MigrationData> loadMigrationData(File file) {
-        return migrationService.loadDataFromCSV(file);
+    public double getMaxMigrationChangePercent(List<MigrationData> data) {
+        return service.calculateMaxMigrationChangePercent(data);
     }
 
-    // Запрос прогнозных данных
-    public List<Double> getForecast(List<MigrationData> data, int windowSize, int forecastYears) {
-        return migrationService.calculateForecast(data, windowSize, forecastYears);
+    public List<Double> getImmigrationForecast(List<MigrationData> data,
+                                               int windowSize, int forecastYears) {
+        return service.calculateImmigrationForecast(data, windowSize, forecastYears);
     }
 
-    // Получение статистики
-    public MigrationService.MigrationStats getMigrationStats(List<MigrationData> data) {
-        return migrationService.calculateMigrationStats(data);
+    public List<Double> getEmigrationForecast(List<MigrationData> data,
+                                              int windowSize, int forecastYears) {
+        return service.calculateEmigrationForecast(data, windowSize, forecastYears);
     }
 }

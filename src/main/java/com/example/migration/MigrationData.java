@@ -7,34 +7,36 @@ import javafx.beans.property.SimpleIntegerProperty;
 
 public class MigrationData {
     private final IntegerProperty year;
-    private final DoubleProperty value;
+    private final DoubleProperty immigrants;
+    private final DoubleProperty emigrants;
 
-    public MigrationData(int year, double value) {
-        this.year = new SimpleIntegerProperty(year);
-        this.value = new SimpleDoubleProperty(value);
+    public MigrationData(int year, double immigrants, double emigrants) {
+        this.year       = new SimpleIntegerProperty(year);
+        this.immigrants = new SimpleDoubleProperty(immigrants);
+        this.emigrants  = new SimpleDoubleProperty(emigrants);
     }
 
+    // Year
     public int getYear() {
         return year.get();
     }
-
     public IntegerProperty yearProperty() {
         return year;
     }
 
-    public void setYear(int year) {
-        this.year.set(year);
+    // Immigrants
+    public double getImmigrants() {
+        return immigrants.get();
+    }
+    public DoubleProperty immigrantsProperty() {
+        return immigrants;
     }
 
-    public double getValue() {
-        return value.get();
+    // Emigrants
+    public double getEmigrants() {
+        return emigrants.get();
     }
-
-    public DoubleProperty valueProperty() {
-        return value;
-    }
-
-    public void setValue(double value) {
-        this.value.set(value);
+    public DoubleProperty emigrantsProperty() {
+        return emigrants;
     }
 }

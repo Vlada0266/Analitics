@@ -6,78 +6,70 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MigrationService {
+    public class MigrationService {
 
-    // загрузка из CSV
-    public List<MigrationData> loadDataFromCSV(File file) {
-        List<MigrationData> dataList = new ArrayList<>();
-        try {
-            List<String> lines = Files.readAllLines(file.toPath());
-            for (String line : lines) {
-                String[] parts = line.split("[,;\\t]");
-                if (parts.length >= 2) {
-                    int year = Integer.parseInt(parts[0].trim());
-                    double value = Double.parseDouble(parts[1].trim());
-                    dataList.add(new MigrationData(year, value));
+        // Загружает (год;imm;em)
+        public List<MigrationData> loadDataFromCSV(File file) {
+            List<MigrationData> data = new ArrayList<>();
+            try {
+                for (String line : Files.readAllLines(file.toPath())) {
+                    String[] p = line.split("[,;\\t]");
+                    if (p.length >= 3) {
+                        int year = Integer.parseInt(p[0].trim());
+                        double imm = Double.parseDouble(p[1].trim());
+                        double em  = Double.parseDouble(p[2].trim());
+                        data.add(new MigrationData(year, imm, em));
+                    }
                 }
+            } catch (IOException|NumberFormatException e) {
+                e.printStackTrace();
             }
-        } catch (IOException | NumberFormatException e) {
-            e.printStackTrace();
-        }
-        return dataList;
-    }
-
-    // Анализ статистики
-    public MigrationStats calculateMigrationStats(List<MigrationData> data) {
-        if (data == null || data.size() < 2) return null;
-
-        double maxIncrease = Double.NEGATIVE_INFINITY;
-        double maxDecrease = Double.POSITIVE_INFINITY;
-
-        for (int i = 1; i < data.size(); i++) {
-            double prev = data.get(i - 1).getValue();
-            double curr = data.get(i).getValue();
-            double changePercent = ((curr - prev) / Math.abs(prev)) * 100;
-
-            if (changePercent > maxIncrease) maxIncrease = changePercent;
-            if (changePercent < maxDecrease) maxDecrease = changePercent;
+            return data;
         }
 
-        return new MigrationStats(maxIncrease, maxDecrease);
-    }
-
-    // Класс для хранения статистики
-    public static class MigrationStats {
-        private final double maxIncreasePercent;
-        private final double maxDecreasePercent;
-
-        public MigrationStats(double maxIncreasePercent, double maxDecreasePercent) {
-            this.maxIncreasePercent = maxIncreasePercent;
-            this.maxDecreasePercent = maxDecreasePercent;
-        }
-
-        public double getMaxIncreasePercent() { return maxIncreasePercent; }
-        public double getMaxDecreasePercent() { return maxDecreasePercent; }
-    }
-
-    // Прогноз скользящим средним
-    public List<Double> calculateForecast(List<MigrationData> data, int windowSize, int forecastYears) {
-        List<Double> forecast = new ArrayList<>();
-        List<Double> values = new ArrayList<>();
-        for (MigrationData d : data) {
-            values.add(d.getValue());
-        }
-
-        for (int i = 0; i < forecastYears; i++) {
-            int startIdx = values.size() - windowSize;
-            double sum = 0;
-            for (int j = startIdx; j < values.size(); j++) {
-                sum += values.get(j);
+        // 1) Макс % изменения общего потока (imm+em)
+        public double calculateMaxMigrationChangePercent(List<MigrationData> data) {
+            if (data==null||data.size()<2) return 0;
+            double max=0;
+            for(int i=1;i<data.size();i++){
+                double prev=data.get(i-1).getImmigrants()+data.get(i-1).getEmigrants();
+                double cur =data.get(i).getImmigrants() +data.get(i).getEmigrants();
+                if(prev==0) continue;
+                double pct = Math.abs((cur-prev)/prev)*100;
+                if(pct>max) max=pct;
             }
-            double avg = sum / windowSize;
-            forecast.add(avg);
-            values.add(avg);
+            return max;
         }
-        return forecast;
+
+        // 2) Прогноз по иммигрантам
+        public List<Double> calculateImmigrationForecast(List<MigrationData> data,
+                                                         int windowSize, int forecastYears) {
+            List<Double> vals = new ArrayList<>();
+            for(var d:data) vals.add(d.getImmigrants());
+            return slidingAverageForecast(vals, windowSize, forecastYears);
+        }
+
+        // 3) Прогноз по эмигрантам
+        public List<Double> calculateEmigrationForecast(List<MigrationData> data,
+                                                        int windowSize, int forecastYears) {
+            List<Double> vals = new ArrayList<>();
+            for(var d:data) vals.add(d.getEmigrants());
+            return slidingAverageForecast(vals, windowSize, forecastYears);
+        }
+
+        // Вспомогательный метод
+        private List<Double> slidingAverageForecast(List<Double> values,
+                                                    int windowSize, int forecastYears) {
+            List<Double> forecast = new ArrayList<>();
+            List<Double> buf = new ArrayList<>(values);
+            for(int i=0;i<forecastYears;i++){
+                int start = buf.size()-windowSize;
+                double sum=0;
+                for(int j=start;j<buf.size();j++) sum+=buf.get(j);
+                double avg = sum/windowSize;
+                forecast.add(avg);
+                buf.add(avg);
+            }
+            return forecast;
+        }
     }
-}
